@@ -1,6 +1,7 @@
 package de.yeganegi.payroll.ui;
 
 import de.yeganegi.payroll.calculation.AutomaticDeductionCalculator;
+import de.yeganegi.payroll.database.DatabaseManager;
 import de.yeganegi.payroll.calculation.MonthlyReportCalculator;
 import de.yeganegi.payroll.calculation.PayrollCalculator;
 import de.yeganegi.payroll.model.Deduction;
@@ -9,7 +10,9 @@ import de.yeganegi.payroll.model.EmploymentType;
 import de.yeganegi.payroll.model.MonthlyReport;
 import de.yeganegi.payroll.model.Payroll;
 import de.yeganegi.payroll.model.WorkEntry;
-import de.yeganegi.payroll.repository.InMemoryWorkEntryRepository;
+import de.yeganegi.payroll.repository.EmployeeRepository;
+import de.yeganegi.payroll.repository.SQLiteEmployeeRepository;
+import de.yeganegi.payroll.repository.SQLiteWorkEntryRepository;
 import de.yeganegi.payroll.repository.WorkEntryRepository;
 
 import java.math.BigDecimal;
@@ -24,6 +27,7 @@ public class ConsoleApplication {
 
     private final Scanner scanner;
     private final WorkEntryRepository workEntryRepository;
+    private final EmployeeRepository employeeRepository;
     private final MonthlyReportCalculator monthlyReportCalculator;
     private final AutomaticDeductionCalculator deductionCalculator;
     private final PayrollCalculator payrollCalculator;
@@ -32,8 +36,12 @@ public class ConsoleApplication {
 
     public ConsoleApplication() {
         this.scanner = new Scanner(System.in);
+        DatabaseManager.initializeDatabase();
+
         this.workEntryRepository =
-                new InMemoryWorkEntryRepository();
+                new SQLiteWorkEntryRepository();
+        this.employeeRepository =
+                new SQLiteEmployeeRepository();
         this.monthlyReportCalculator =
                 new MonthlyReportCalculator();
         this.deductionCalculator =
@@ -44,7 +52,25 @@ public class ConsoleApplication {
 
     public void start() {
         printHeader();
-        employee = createEmployee();
+
+        employee = employeeRepository
+                .findById(1)
+                .orElseGet(() -> {
+                    Employee newEmployee =
+                            createEmployee();
+
+                    employeeRepository.save(
+                            newEmployee
+                    );
+
+                    return newEmployee;
+                });
+
+        System.out.println();
+        System.out.println(
+                "Aktiver Mitarbeiter: "
+                        + employee.getFullName()
+        );
 
         boolean running = true;
 
