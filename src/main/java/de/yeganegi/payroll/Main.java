@@ -1,18 +1,18 @@
 package de.yeganegi.payroll;
 
-import de.yeganegi.payroll.calculation.GrossIncomeCalculator;
-import de.yeganegi.payroll.calculation.WorkdayCalculator;
+import de.yeganegi.payroll.calculation.MonthlyReportCalculator;
 import de.yeganegi.payroll.model.Employee;
 import de.yeganegi.payroll.model.EmploymentType;
+import de.yeganegi.payroll.model.MonthlyReport;
 import de.yeganegi.payroll.model.WorkEntry;
-import de.yeganegi.payroll.model.WorkdayType;
-import de.yeganegi.payroll.time.TimeUtil;
-import de.yeganegi.payroll.time.WorkingTimeCalculator;
+import de.yeganegi.payroll.repository.InMemoryWorkEntryRepository;
+import de.yeganegi.payroll.repository.WorkEntryRepository;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.YearMonth;
+import java.util.List;
 
 public final class Main {
 
@@ -29,47 +29,66 @@ public final class Main {
                 new BigDecimal("16.00")
         );
 
-        WorkEntry workEntry = new WorkEntry(
-                LocalDate.of(2026, 7, 15),
-                LocalTime.of(18, 0),
-                LocalTime.of(2, 30),
-                30
+        WorkEntryRepository repository =
+                new InMemoryWorkEntryRepository();
+
+        repository.save(
+                employee.getId(),
+                new WorkEntry(
+                        LocalDate.of(2026, 7, 1),
+                        LocalTime.of(8, 0),
+                        LocalTime.of(12, 0),
+                        0
+                )
         );
 
-        WorkingTimeCalculator workingTimeCalculator =
-                new WorkingTimeCalculator();
-
-        Duration duration = workingTimeCalculator.calculate(
-                workEntry.getStartTime(),
-                workEntry.getEndTime(),
-                workEntry.getBreakMinutes()
+        repository.save(
+                employee.getId(),
+                new WorkEntry(
+                        LocalDate.of(2026, 7, 2),
+                        LocalTime.of(8, 0),
+                        LocalTime.of(17, 0),
+                        60
+                )
         );
 
-        BigDecimal workingHours = TimeUtil.toHours(duration);
-
-        WorkdayCalculator workdayCalculator =
-                new WorkdayCalculator();
-
-        WorkdayType workdayType =
-                workdayCalculator.calculate(workingHours);
-
-        GrossIncomeCalculator grossIncomeCalculator =
-                new GrossIncomeCalculator();
-
-        BigDecimal grossIncome = grossIncomeCalculator.calculate(
-                workingHours,
-                employee.getHourlyWage()
+        repository.save(
+                employee.getId(),
+                new WorkEntry(
+                        LocalDate.of(2026, 7, 3),
+                        LocalTime.of(18, 0),
+                        LocalTime.of(2, 30),
+                        30
+                )
         );
+
+        YearMonth month = YearMonth.of(2026, 7);
+
+        List<WorkEntry> workEntries =
+                repository.findByEmployeeAndMonth(
+                        employee.getId(),
+                        month
+                );
+
+        MonthlyReportCalculator calculator =
+                new MonthlyReportCalculator();
+
+        MonthlyReport report =
+                calculator.calculate(
+                        employee,
+                        month,
+                        workEntries
+                );
 
         System.out.println("--------------------------------");
         System.out.println("Mitarbeiter    : " + employee.getFullName());
-        System.out.println("Student        : " + employee.isStudent());
-        System.out.println("Beschäftigung  : " + employee.getEmploymentType());
-        System.out.println("Datum          : " + workEntry.getDate());
-        System.out.println("Arbeitsstunden : " + workingHours);
-        System.out.println("Arbeitstage    : " + workdayType.getValue());
-        System.out.println("Stundenlohn    : " + employee.getHourlyWage() + " €");
-        System.out.println("Brutto         : " + grossIncome + " €");
+        System.out.println("Monat          : " + report.getMonth());
+        System.out.println("Schichten      : " + report.getWorkEntryCount());
+        System.out.println("Arbeitsstunden : " + report.getTotalWorkingHours());
+        System.out.println("Halbe Tage     : " + report.getHalfDays());
+        System.out.println("Volle Tage     : " + report.getFullDays());
+        System.out.println("Arbeitstage    : " + report.getTotalWorkdays());
+        System.out.println("Brutto         : " + report.getGrossIncome() + " €");
         System.out.println("--------------------------------");
     }
 }
