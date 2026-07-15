@@ -5,6 +5,8 @@ import de.yeganegi.payroll.config.EstimatedProfileFactory;
 import de.yeganegi.payroll.model.Deduction;
 import de.yeganegi.payroll.model.DeductionType;
 import de.yeganegi.payroll.model.Employee;
+import de.yeganegi.payroll.model.PayrollProfile;
+import de.yeganegi.payroll.model.TaxClass;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -14,9 +16,37 @@ import java.util.Objects;
 
 public class AutomaticDeductionCalculator {
 
+    private static final BigDecimal CHURCH_TAX_RATE =
+            new BigDecimal("0.09");
+
     public List<Deduction> calculate(
             Employee employee,
             BigDecimal grossIncome
+    ) {
+        EstimatedDeductionProfile baseProfile =
+                EstimatedProfileFactory.create(
+                        employee.getEmploymentType()
+                );
+
+        PayrollProfile defaultProfile =
+                new PayrollProfile(
+                        employee.getId(),
+                        TaxClass.I,
+                        baseProfile.healthInsuranceRate(),
+                        false
+                );
+
+        return calculate(
+                employee,
+                grossIncome,
+                defaultProfile
+        );
+    }
+
+    public List<Deduction> calculate(
+            Employee employee,
+            BigDecimal grossIncome,
+            PayrollProfile payrollProfile
     ) {
         Objects.requireNonNull(
                 employee,
@@ -28,73 +58,157 @@ public class AutomaticDeductionCalculator {
                 "Bruttoeinkommen darf nicht null sein."
         );
 
+        Objects.requireNonNull(
+                payrollProfile,
+                "Abrechnungsprofil darf nicht null sein."
+        );
+
         if (grossIncome.signum() < 0) {
             throw new IllegalArgumentException(
                     "Bruttoeinkommen darf nicht negativ sein."
             );
         }
 
-        EstimatedDeductionProfile profile =
+        if (employee.getId()
+                != payrollProfile.employeeId()) {
+            throw new IllegalArgumentException(
+                    "Abrechnungsprofil gehört nicht zum Mitarbeiter."
+            );
+        }
+
+        EstimatedDeductionProfile baseProfile =
                 EstimatedProfileFactory.create(
                         employee.getEmploymentType()
                 );
 
-        List<Deduction> deductions = new ArrayList<>();
+        List<Deduction> deductions =
+                new ArrayList<>();
 
-        addDeduction(
+        BigDecimal estimatedWageTaxRate =
+                baseProfile
+                        .wageTaxRate()
+                        .multiply(
+                                taxClassFactor(
+                                        payrollProfile.taxClass()
+                                )
+                        );
+
+        BigDecimal wageTax =
+                calculateAmount(
+                        grossIncome,
+                        estimatedWageTaxRate
+                );
+
+        addAmountDeduction(
                 deductions,
                 DeductionType.WAGE_TAX,
-                grossIncome,
-                profile.wageTaxRate()
+                wageTax
         );
 
-        addDeduction(
+        addRateDeduction(
                 deductions,
                 DeductionType.HEALTH_INSURANCE,
                 grossIncome,
-                profile.healthInsuranceRate()
+                payrollProfile.healthInsuranceRate()
         );
 
-        addDeduction(
+        addRateDeduction(
                 deductions,
                 DeductionType.PENSION_INSURANCE,
                 grossIncome,
-                profile.pensionInsuranceRate()
+                baseProfile.pensionInsuranceRate()
         );
 
-        addDeduction(
+        addRateDeduction(
                 deductions,
                 DeductionType.NURSING_CARE_INSURANCE,
                 grossIncome,
-                profile.nursingCareInsuranceRate()
+                baseProfile.nursingCareInsuranceRate()
         );
 
-        addDeduction(
+        addRateDeduction(
                 deductions,
                 DeductionType.UNEMPLOYMENT_INSURANCE,
                 grossIncome,
-                profile.unemploymentInsuranceRate()
+                baseProfile.unemploymentInsuranceRate()
         );
+
+        if (payrollProfile.churchTaxEnabled()
+                && wageTax.signum() > 0) {
+
+            BigDecimal churchTax =
+                    wageTax
+                            .multiply(CHURCH_TAX_RATE)
+                            .setScale(
+                                    2,
+                                    RoundingMode.HALF_UP
+                            );
+
+            addAmountDeduction(
+                    deductions,
+                    DeductionType.CHURCH_TAX,
+                    churchTax
+            );
+        }
 
         return List.copyOf(deductions);
     }
 
-    private void addDeduction(
+    private BigDecimal taxClassFactor(
+            TaxClass taxClass
+    ) {
+        return switch (taxClass) {
+            case I -> new BigDecimal("1.00");
+            case II -> new BigDecimal("0.85");
+            case III -> new BigDecimal("0.60");
+            case IV -> new BigDecimal("1.00");
+            case V -> new BigDecimal("1.35");
+            case VI -> new BigDecimal("1.60");
+        };
+    }
+
+    private void addRateDeduction(
             List<Deduction> deductions,
             DeductionType type,
             BigDecimal grossIncome,
             BigDecimal rate
     ) {
-        if (rate.signum() == 0) {
+        addAmountDeduction(
+                deductions,
+                type,
+                calculateAmount(
+                        grossIncome,
+                        rate
+                )
+        );
+    }
+
+    private BigDecimal calculateAmount(
+            BigDecimal grossIncome,
+            BigDecimal rate
+    ) {
+        return grossIncome
+                .multiply(rate)
+                .setScale(
+                        2,
+                        RoundingMode.HALF_UP
+                );
+    }
+
+    private void addAmountDeduction(
+            List<Deduction> deductions,
+            DeductionType type,
+            BigDecimal amount
+    ) {
+        if (amount.signum() == 0) {
             return;
         }
 
-        BigDecimal amount = grossIncome
-                .multiply(rate)
-                .setScale(2, RoundingMode.HALF_UP);
-
         deductions.add(
-                new Deduction(type, amount)
+                new Deduction(
+                        type,
+                        amount
+                )
         );
     }
 }

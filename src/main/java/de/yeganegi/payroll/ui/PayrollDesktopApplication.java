@@ -13,11 +13,14 @@ import de.yeganegi.payroll.model.Employee;
 import de.yeganegi.payroll.model.EmploymentType;
 import de.yeganegi.payroll.model.MonthlyReport;
 import de.yeganegi.payroll.model.Payroll;
+import de.yeganegi.payroll.model.PayrollProfile;
+import de.yeganegi.payroll.model.TaxClass;
 import de.yeganegi.payroll.model.StoredWorkEntry;
 import de.yeganegi.payroll.model.WorkEntry;
 import de.yeganegi.payroll.repository.EmployeeRepository;
 import de.yeganegi.payroll.repository.SQLiteEmployeeRepository;
 import de.yeganegi.payroll.repository.SQLiteWorkEntryRepository;
+import de.yeganegi.payroll.repository.PayrollProfileRepository;
 import javafx.application.Application;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -62,6 +65,9 @@ public class PayrollDesktopApplication
     private final SQLiteWorkEntryRepository workEntryRepository =
             new SQLiteWorkEntryRepository();
 
+    private final PayrollProfileRepository payrollProfileRepository =
+            new PayrollProfileRepository();
+
     private final MonthlyReportCalculator monthlyReportCalculator =
             new MonthlyReportCalculator();
 
@@ -100,6 +106,15 @@ private final ReportExportService reportExportService =
     private final ComboBox<EmploymentType> employmentTypeBox =
             new ComboBox<>();
 
+    private final ComboBox<TaxClass> taxClassBox =
+            new ComboBox<>();
+
+    private final TextField healthInsuranceRateField =
+            new TextField("0.00");
+
+    private final CheckBox churchTaxCheckBox =
+            new CheckBox("Kirchensteuer berücksichtigen");
+
     private final DatePicker workDatePicker =
             new DatePicker(LocalDate.now());
 
@@ -136,6 +151,12 @@ private final ReportExportService reportExportService =
         employmentTypeBox.setValue(
                 EmploymentType.WORKING_STUDENT
         );
+
+        taxClassBox.getItems().setAll(
+                TaxClass.values()
+        );
+
+        taxClassBox.setValue(TaxClass.I);
 
         resultArea.setEditable(false);
         resultArea.setPrefRowCount(11);
@@ -204,6 +225,22 @@ private final ReportExportService reportExportService =
 
         grid.add(studentCheckBox, 1, 4);
 
+        grid.add(
+                new Label("Steuerklasse:"),
+                0,
+                5
+        );
+        grid.add(taxClassBox, 1, 5);
+
+        grid.add(
+                new Label("Krankenversicherung in %:"),
+                0,
+                6
+        );
+        grid.add(healthInsuranceRateField, 1, 6);
+
+        grid.add(churchTaxCheckBox, 1, 7);
+
         Button saveButton =
                 new Button(
                         "Mitarbeiter speichern"
@@ -213,7 +250,7 @@ private final ReportExportService reportExportService =
                 event -> saveEmployee()
         );
 
-        grid.add(saveButton, 1, 5);
+        grid.add(saveButton, 1, 8);
 
         return grid;
     }
@@ -448,6 +485,28 @@ Button textButton =
                             employee.isStudent()
                     );
                 });
+
+        payrollProfileRepository
+                .findByEmployeeId(EMPLOYEE_ID)
+                .ifPresent(profile -> {
+                    taxClassBox.setValue(
+                            profile.taxClass()
+                    );
+
+                    healthInsuranceRateField.setText(
+                            profile
+                                    .healthInsuranceRate()
+                                    .multiply(
+                                            new BigDecimal("100")
+                                    )
+                                    .stripTrailingZeros()
+                                    .toPlainString()
+                    );
+
+                    churchTaxCheckBox.setSelected(
+                            profile.churchTaxEnabled()
+                    );
+                });
     }
 
     private Employee readEmployee() {
@@ -532,8 +591,39 @@ Button textButton =
 
     private void saveEmployee() {
         try {
-            employeeRepository.save(
-                    readEmployee()
+            Employee employee = readEmployee();
+
+            employeeRepository.save(employee);
+
+            BigDecimal healthInsuranceRate =
+                    new BigDecimal(
+                            healthInsuranceRateField
+                                    .getText()
+                                    .trim()
+                                    .replace(",", ".")
+                    )
+                            .divide(
+                                    new BigDecimal("100"),
+                                    6,
+                                    java.math.RoundingMode.HALF_UP
+                            );
+
+            TaxClass taxClass =
+                    taxClassBox.getValue();
+
+            if (taxClass == null) {
+                throw new IllegalArgumentException(
+                        "Steuerklasse auswählen."
+                );
+            }
+
+            payrollProfileRepository.save(
+                    new PayrollProfile(
+                            employee.getId(),
+                            taxClass,
+                            healthInsuranceRate,
+                            churchTaxCheckBox.isSelected()
+                    )
             );
 
             showInformation(
@@ -718,10 +808,25 @@ Button textButton =
                             entries
                     );
 
+            PayrollProfile payrollProfile =
+                    payrollProfileRepository
+                            .findByEmployeeId(
+                                    employee.getId()
+                            )
+                            .orElse(
+                                    new PayrollProfile(
+                                            employee.getId(),
+                                            TaxClass.I,
+                                            BigDecimal.ZERO,
+                                            false
+                                    )
+                            );
+
             List<Deduction> deductions =
                     deductionCalculator.calculate(
                             employee,
-                            monthlyReport.getGrossIncome()
+                            monthlyReport.getGrossIncome(),
+                            payrollProfile
                     );
 
             Payroll payroll =
