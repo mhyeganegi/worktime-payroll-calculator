@@ -4,7 +4,10 @@ import de.yeganegi.payroll.calculation.AutomaticDeductionCalculator;
 import de.yeganegi.payroll.calculation.MonthlyReportCalculator;
 import de.yeganegi.payroll.calculation.PayrollCalculator;
 import de.yeganegi.payroll.database.DatabaseManager;
+
 import de.yeganegi.payroll.export.ReportExportService;
+import de.yeganegi.payroll.export.PdfReportExportService;
+
 import de.yeganegi.payroll.model.Deduction;
 import de.yeganegi.payroll.model.Employee;
 import de.yeganegi.payroll.model.EmploymentType;
@@ -68,8 +71,13 @@ public class PayrollDesktopApplication
     private final PayrollCalculator payrollCalculator =
             new PayrollCalculator();
 
-    private final ReportExportService reportExportService =
+    
+private final ReportExportService reportExportService =
             new ReportExportService();
+
+    private final PdfReportExportService pdfReportExportService =
+            new PdfReportExportService();
+
 
     private Employee lastEmployee;
     private MonthlyReport lastMonthlyReport;
@@ -315,15 +323,25 @@ public class PayrollDesktopApplication
                 event -> exportCsv()
         );
 
-        Button textButton =
+        
+Button textButton =
                 new Button("Abrechnung als TXT speichern");
 
         textButton.setOnAction(
                 event -> exportText()
         );
 
+        Button pdfButton =
+                new Button("Abrechnung als PDF speichern");
+
+        pdfButton.setOnAction(
+                event -> exportPdf()
+        );
+
         grid.add(csvButton, 2, 1);
         grid.add(textButton, 3, 1);
+        grid.add(pdfButton, 4, 1);
+
 
         return grid;
     }
@@ -734,7 +752,57 @@ public class PayrollDesktopApplication
         }
     }
 
+
+    private void exportPdf() {
+        try {
+            requireCalculatedReport();
+
+            FileChooser chooser =
+                    new FileChooser();
+
+            chooser.setTitle(
+                    "PDF-Abrechnung speichern"
+            );
+
+            chooser.setInitialFileName(
+                    "monatsabrechnung-"
+                            + lastMonthlyReport.getMonth()
+                            + ".pdf"
+            );
+
+            chooser.getExtensionFilters().add(
+                    new FileChooser.ExtensionFilter(
+                            "PDF-Dateien",
+                            "*.pdf"
+                    )
+            );
+
+            File file =
+                    chooser.showSaveDialog(
+                            resultArea
+                                    .getScene()
+                                    .getWindow()
+                    );
+
+            if (file == null) {
+                return;
+            }
+
+            pdfReportExportService.export(
+                    file.toPath(),
+                    lastReportText
+            );
+
+            showInformation(
+                    "PDF-Abrechnung wurde gespeichert."
+            );
+        } catch (Exception exception) {
+            showError(exception.getMessage());
+        }
+    }
+
     private void exportCsv() {
+
         try {
             requireCalculatedReport();
 
