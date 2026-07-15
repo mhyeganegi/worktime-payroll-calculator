@@ -16,6 +16,7 @@ public class SQLiteEmployeeRepository
 
     @Override
     public void save(Employee employee) {
+
         if (employee == null) {
             throw new IllegalArgumentException(
                     "Mitarbeiter darf nicht null sein."
@@ -43,32 +44,43 @@ public class SQLiteEmployeeRepository
         try (
                 Connection connection =
                         DatabaseManager.getConnection();
+
                 PreparedStatement statement =
                         connection.prepareStatement(sql)
         ) {
-            statement.setLong(1, employee.getId());
+            statement.setLong(
+                    1,
+                    employee.getId()
+            );
+
             statement.setString(
                     2,
                     employee.getFirstName()
             );
+
             statement.setString(
                     3,
                     employee.getLastName()
             );
+
             statement.setBoolean(
                     4,
                     employee.isStudent()
             );
+
             statement.setString(
                     5,
                     employee.getEmploymentType().name()
             );
+
             statement.setString(
                     6,
-                    employee.getHourlyWage().toPlainString()
+                    employee.getHourlyWage()
+                            .toPlainString()
             );
 
             statement.executeUpdate();
+
         } catch (SQLException exception) {
             throw new IllegalStateException(
                     "Mitarbeiter konnte nicht gespeichert werden.",
@@ -78,7 +90,9 @@ public class SQLiteEmployeeRepository
     }
 
     @Override
-    public Optional<Employee> findById(long employeeId) {
+    public Optional<Employee> findById(
+            long employeeId
+    ) {
         if (employeeId <= 0) {
             throw new IllegalArgumentException(
                     "Mitarbeiter-ID muss größer als 0 sein."
@@ -100,37 +114,50 @@ public class SQLiteEmployeeRepository
         try (
                 Connection connection =
                         DatabaseManager.getConnection();
+
                 PreparedStatement statement =
                         connection.prepareStatement(sql)
         ) {
-            statement.setLong(1, employeeId);
+            statement.setLong(
+                    1,
+                    employeeId
+            );
 
-            try (ResultSet resultSet =
-                         statement.executeQuery()) {
-
+            try (
+                    ResultSet resultSet =
+                            statement.executeQuery()
+            ) {
                 if (!resultSet.next()) {
                     return Optional.empty();
                 }
 
-                Employee employee = new Employee(
-                        resultSet.getLong("id"),
-                        resultSet.getString("first_name"),
-                        resultSet.getString("last_name"),
-                        resultSet.getBoolean("student"),
-                        EmploymentType.valueOf(
+                Employee employee =
+                        new Employee(
+                                resultSet.getLong("id"),
                                 resultSet.getString(
-                                        "employment_type"
-                                )
-                        ),
-                        new BigDecimal(
+                                        "first_name"
+                                ),
                                 resultSet.getString(
-                                        "hourly_wage"
+                                        "last_name"
+                                ),
+                                resultSet.getBoolean(
+                                        "student"
+                                ),
+                                EmploymentType.valueOf(
+                                        resultSet.getString(
+                                                "employment_type"
+                                        )
+                                ),
+                                new BigDecimal(
+                                        resultSet.getString(
+                                                "hourly_wage"
+                                        )
                                 )
-                        )
-                );
+                        );
 
                 return Optional.of(employee);
             }
+
         } catch (SQLException exception) {
             throw new IllegalStateException(
                     "Mitarbeiter konnte nicht geladen werden.",

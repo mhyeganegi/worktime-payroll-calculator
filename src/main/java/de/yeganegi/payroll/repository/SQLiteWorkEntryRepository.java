@@ -4,10 +4,10 @@ import de.yeganegi.payroll.database.DatabaseManager;
 import de.yeganegi.payroll.model.WorkEntry;
 
 import java.sql.Connection;
-import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -43,28 +43,37 @@ public class SQLiteWorkEntryRepository
         try (
                 Connection connection =
                         DatabaseManager.getConnection();
+
                 PreparedStatement statement =
                         connection.prepareStatement(sql)
         ) {
-            statement.setLong(1, employeeId);
+            statement.setLong(
+                    1,
+                    employeeId
+            );
+
             statement.setString(
                     2,
                     workEntry.getDate().toString()
             );
+
             statement.setString(
                     3,
                     workEntry.getStartTime().toString()
             );
+
             statement.setString(
                     4,
                     workEntry.getEndTime().toString()
             );
+
             statement.setInt(
                     5,
                     workEntry.getBreakMinutes()
             );
 
             statement.executeUpdate();
+
         } catch (SQLException exception) {
             throw new IllegalStateException(
                     "Schicht konnte nicht gespeichert werden.",
@@ -104,14 +113,20 @@ public class SQLiteWorkEntryRepository
         try (
                 Connection connection =
                         DatabaseManager.getConnection();
+
                 PreparedStatement statement =
                         connection.prepareStatement(sql)
         ) {
-            statement.setLong(1, employeeId);
+            statement.setLong(
+                    1,
+                    employeeId
+            );
+
             statement.setString(
                     2,
                     month.atDay(1).toString()
             );
+
             statement.setString(
                     3,
                     month.plusMonths(1)
@@ -119,17 +134,18 @@ public class SQLiteWorkEntryRepository
                             .toString()
             );
 
-            try (ResultSet resultSet =
-                         statement.executeQuery()) {
-
+            try (
+                    ResultSet resultSet =
+                            statement.executeQuery()
+            ) {
                 while (resultSet.next()) {
                     workEntries.add(
                             new WorkEntry(
-                                    Date.valueOf(
+                                    LocalDate.parse(
                                             resultSet.getString(
                                                     "work_date"
                                             )
-                                    ).toLocalDate(),
+                                    ),
                                     LocalTime.parse(
                                             resultSet.getString(
                                                     "start_time"
@@ -149,6 +165,7 @@ public class SQLiteWorkEntryRepository
             }
 
             return List.copyOf(workEntries);
+
         } catch (SQLException exception) {
             throw new IllegalStateException(
                     "Schichten konnten nicht geladen werden.",
@@ -157,7 +174,9 @@ public class SQLiteWorkEntryRepository
         }
     }
 
-    private void validateEmployeeId(long employeeId) {
+    private void validateEmployeeId(
+            long employeeId
+    ) {
         if (employeeId <= 0) {
             throw new IllegalArgumentException(
                     "Mitarbeiter-ID muss größer als 0 sein."

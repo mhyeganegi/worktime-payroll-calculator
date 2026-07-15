@@ -9,7 +9,6 @@ import java.sql.Statement;
 
 public final class DatabaseManager {
 
-    private static final String DATABASE_DIRECTORY = "data";
     private static final String DATABASE_URL =
             "jdbc:sqlite:data/payroll.db";
 
@@ -18,11 +17,16 @@ public final class DatabaseManager {
 
     public static Connection getConnection()
             throws SQLException {
+
         createDatabaseDirectory();
-        return DriverManager.getConnection(DATABASE_URL);
+
+        return DriverManager.getConnection(
+                DATABASE_URL
+        );
     }
 
     public static void initializeDatabase() {
+
         String employeeTable = """
                 CREATE TABLE IF NOT EXISTS employee (
                     id INTEGER PRIMARY KEY,
@@ -50,11 +54,16 @@ public final class DatabaseManager {
 
         try (
                 Connection connection = getConnection();
-                Statement statement = connection.createStatement()
+                Statement statement =
+                        connection.createStatement()
         ) {
-            statement.execute("PRAGMA foreign_keys = ON");
+            statement.execute(
+                    "PRAGMA foreign_keys = ON"
+            );
+
             statement.execute(employeeTable);
             statement.execute(workEntryTable);
+
         } catch (SQLException exception) {
             throw new IllegalStateException(
                     "Datenbank konnte nicht initialisiert werden.",
@@ -66,7 +75,7 @@ public final class DatabaseManager {
     private static void createDatabaseDirectory() {
         try {
             Files.createDirectories(
-                    Path.of(DATABASE_DIRECTORY)
+                    Path.of("data")
             );
         } catch (Exception exception) {
             throw new IllegalStateException(
