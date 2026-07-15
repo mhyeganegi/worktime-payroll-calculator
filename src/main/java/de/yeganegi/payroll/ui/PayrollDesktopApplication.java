@@ -4,6 +4,7 @@ import de.yeganegi.payroll.calculation.AutomaticDeductionCalculator;
 import de.yeganegi.payroll.calculation.MonthlyReportCalculator;
 import de.yeganegi.payroll.calculation.PayrollCalculator;
 import de.yeganegi.payroll.database.DatabaseManager;
+import de.yeganegi.payroll.export.ReportExportService;
 import de.yeganegi.payroll.model.Deduction;
 import de.yeganegi.payroll.model.Employee;
 import de.yeganegi.payroll.model.EmploymentType;
@@ -35,8 +36,10 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import java.io.File;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -64,6 +67,15 @@ public class PayrollDesktopApplication
 
     private final PayrollCalculator payrollCalculator =
             new PayrollCalculator();
+
+    private final ReportExportService reportExportService =
+            new ReportExportService();
+
+    private Employee lastEmployee;
+    private MonthlyReport lastMonthlyReport;
+    private Payroll lastPayroll;
+    private List<StoredWorkEntry> lastStoredEntries;
+    private String lastReportText;
 
     private final TextField firstNameField =
             new TextField();
@@ -295,6 +307,23 @@ public class PayrollDesktopApplication
         });
 
         grid.add(reportButton, 1, 1);
+
+        Button csvButton =
+                new Button("CSV exportieren");
+
+        csvButton.setOnAction(
+                event -> exportCsv()
+        );
+
+        Button textButton =
+                new Button("Abrechnung als TXT speichern");
+
+        textButton.setOnAction(
+                event -> exportText()
+        );
+
+        grid.add(csvButton, 2, 1);
+        grid.add(textButton, 3, 1);
 
         return grid;
     }
@@ -684,15 +713,121 @@ public class PayrollDesktopApplication
                             deductions
                     );
 
-            resultArea.setText(
-                    createReportText(
-                            employee,
-                            monthlyReport,
-                            payroll
+            lastEmployee = employee;
+            lastMonthlyReport = monthlyReport;
+            lastPayroll = payroll;
+            lastStoredEntries = workEntryRepository
+                    .findStoredByEmployeeAndMonth(
+                            employee.getId(),
+                            month
+                    );
+
+            lastReportText = createReportText(
+                    employee,
+                    monthlyReport,
+                    payroll
+            );
+
+            resultArea.setText(lastReportText);
+        } catch (Exception exception) {
+            showError(exception.getMessage());
+        }
+    }
+
+    private void exportCsv() {
+        try {
+            requireCalculatedReport();
+
+            FileChooser chooser = new FileChooser();
+            chooser.setTitle("CSV-Datei speichern");
+            chooser.setInitialFileName(
+                    "arbeitszeiten-"
+                            + lastMonthlyReport.getMonth()
+                            + ".csv"
+            );
+
+            chooser.getExtensionFilters().add(
+                    new FileChooser.ExtensionFilter(
+                            "CSV-Dateien",
+                            "*.csv"
                     )
+            );
+
+            File file = chooser.showSaveDialog(
+                    workEntryTable.getScene().getWindow()
+            );
+
+            if (file == null) {
+                return;
+            }
+
+            reportExportService.exportCsv(
+                    file.toPath(),
+                    lastEmployee,
+                    lastMonthlyReport.getMonth(),
+                    lastStoredEntries,
+                    lastMonthlyReport,
+                    lastPayroll
+            );
+
+            showInformation(
+                    "CSV-Datei wurde gespeichert."
             );
         } catch (Exception exception) {
             showError(exception.getMessage());
+        }
+    }
+
+    private void exportText() {
+        try {
+            requireCalculatedReport();
+
+            FileChooser chooser = new FileChooser();
+            chooser.setTitle("Abrechnung speichern");
+            chooser.setInitialFileName(
+                    "monatsabrechnung-"
+                            + lastMonthlyReport.getMonth()
+                            + ".txt"
+            );
+
+            chooser.getExtensionFilters().add(
+                    new FileChooser.ExtensionFilter(
+                            "Textdateien",
+                            "*.txt"
+                    )
+            );
+
+            File file = chooser.showSaveDialog(
+                    resultArea.getScene().getWindow()
+            );
+
+            if (file == null) {
+                return;
+            }
+
+            reportExportService.exportText(
+                    file.toPath(),
+                    lastReportText
+            );
+
+            showInformation(
+                    "Abrechnung wurde gespeichert."
+            );
+        } catch (Exception exception) {
+            showError(exception.getMessage());
+        }
+    }
+
+    private void requireCalculatedReport() {
+        if (lastEmployee == null
+                || lastMonthlyReport == null
+                || lastPayroll == null
+                || lastStoredEntries == null
+                || lastReportText == null) {
+
+            throw new IllegalStateException(
+                    "Zuerst Monatsabrechnung berechnen."
+            );
         }
     }
 
