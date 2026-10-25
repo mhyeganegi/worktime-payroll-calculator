@@ -1,50 +1,60 @@
-# Worktime Payroll Calculator
+# Schichtbuch – Arbeitszeit und Monatsübersicht
 
-Java-Anwendung zur Erfassung und Auswertung von Arbeitszeiten sowie zur späteren Berechnung von Brutto- und Nettoeinkommen.
+Eine Java-Desktop-App für Studierende und Werkstudierende, die ihre Schichten erfassen und Arbeitszeit sowie geschätzten Bruttolohn pro Monat nachvollziehen möchten.
 
-## Erste Zielgruppe
+Die App hilft beim persönlichen Überblick. Sie ersetzt keine Lohnabrechnung und berechnet keine rechtsverbindlichen Steuer- oder Sozialversicherungsbeträge.
 
-- Studierende
-- Werkstudierende
-- Minijobber
+## Was die App aktuell kann
 
-Die Architektur wird so aufgebaut, dass später auch Midijob, Teilzeit und Vollzeit unterstützt werden.
+- Beschäftigtenprofil mit Beschäftigungsart und Stundenlohn speichern
+- Schichten mit Datum, Beginn, Ende und Pause erfassen, bearbeiten und löschen
+- Arbeitszeiten über Mitternacht berechnen
+- Monatsübersicht mit Stunden, Arbeitstagen und geschätztem Brutto anzeigen
+- Berichte als PDF, CSV oder Textdatei exportieren
+- Beschäftigten- und Schichtdaten lokal in einer SQLite-Datenbank speichern
 
-## Fachregel für Arbeitstage
+Arbeitstage werden für die Übersicht getrennt von den bezahlten Stunden bewertet:
 
-- `0 Stunden` = `0 Arbeitstage`
-- `mehr als 0 bis einschließlich 4 Stunden` = `0,5 Arbeitstage`
-- `mehr als 4 Stunden` = `1 Arbeitstag`
+- 0 Stunden = 0 Arbeitstage
+- mehr als 0 bis einschließlich 4 Stunden = 0,5 Arbeitstage
+- mehr als 4 Stunden = 1 Arbeitstag
 
-Die tatsächlichen Arbeitsstunden und die bewerteten Arbeitstage werden getrennt behandelt. Der Bruttolohn wird anhand der tatsächlichen Arbeitsstunden berechnet.
+Der Bruttolohn wird aus den erfassten Arbeitsstunden und dem Stundenlohn berechnet.
 
-## Aktueller Stand
+## Voraussetzungen
 
-- Maven-Projekt mit Java 21
-- Modell für Arbeitstagstypen
-- Berechnung von keinem, halbem und vollem Arbeitstag
-- JUnit-Tests für Grenzwerte und Fehlerfälle
-- Konsolendemonstration
+- Java 21
+- Maven 3.9 oder neuer
 
 ## Starten
 
+Repository klonen und im Projektordner ausführen:
+
 ```bash
 mvn clean test
-mvn exec:java -Dexec.mainClass="de.yeganegi.payroll.Main"
+mvn javafx:run
 ```
 
-Alternativ über die IDE die Klasse `Main` starten.
+In einer IDE kann alternativ die Klasse `de.yeganegi.payroll.Main` gestartet werden.
 
-## Geplante Funktionen
+## Daten und Exporte
 
-1. Arbeitsbeginn, Arbeitsende und Pause
-2. Nachtschichten über Mitternacht
-3. Beschäftigte und Beschäftigungsarten
-4. Stundenlohn und Bruttoeinkommen
-5. Studierenden- und Werkstudenten-Auswertungen
-6. konfigurierbare Abzüge
-7. Speicherung mit SQLite
-8. JavaFX-Oberfläche
-9. Monatsabrechnung und PDF-Export
+Die App legt ihre SQLite-Datenbank derzeit unter `data/payroll.db` relativ zum Startordner an. Exporte werden über die Oberfläche erstellt. Sichere die Datenbankdatei regelmäßig selbst; eine automatische Sicherung und Wiederherstellung ist noch nicht Teil der App.
 
-> Steuer- und Sozialversicherungsberechnungen werden später nach Berechnungsjahr konfigurierbar implementiert. Ergebnisse sollen als Berechnungshilfe und nicht als rechtsverbindliche Lohnabrechnung gekennzeichnet werden.
+## Projektstruktur
+
+- `model`: Beschäftigte, Schichten, Lohn- und Monatsübersichtsdaten
+- `calculation`: Arbeitszeit-, Brutto- und Abzugsberechnungen
+- `repository`: Lesen und Speichern von Beschäftigten und Schichten
+- `database`: SQLite-Verbindung und Tabellen
+- `export`: PDF-, CSV- und Textberichte
+- `ui`: JavaFX-Oberfläche
+- `src/test`: Tests für Berechnungen und ausgewählte Datenzugriffe
+
+## Bekannte Grenzen
+
+- Das Profil ist aktuell auf einen Beschäftigten ausgelegt.
+- Abzüge und Nettowerte sind unverbindliche Schätzungen.
+- Die App ist noch nicht als Installationspaket für macOS oder Windows vorbereitet.
+- Es gibt noch keine automatische Datenbanksicherung.
+
