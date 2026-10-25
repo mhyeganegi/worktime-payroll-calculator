@@ -11,6 +11,12 @@ public class WorkingTimeCalculator {
             int breakMinutes
     ) {
 
+        if (start == null || end == null) {
+            throw new IllegalArgumentException(
+                    "Beginn und Ende der Arbeitszeit müssen angegeben sein."
+            );
+        }
+
         if (breakMinutes < 0) {
             throw new IllegalArgumentException("Pause darf nicht negativ sein.");
         }
